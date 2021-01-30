@@ -1,0 +1,14 @@
+*.o
+*.a
+*.so
+
+# Valgrind dumps
+vgcore*
+
+# Executable
+hypercubeCollide
+
+# SVG debug output
+*.svg
+
+__pycache__

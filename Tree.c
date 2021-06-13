@@ -88,28 +88,8 @@ int progressNextElement(int* t, int len){//This function takes an array of -1's,
 	//printf("RETURN: %d\n", ret);
 }
 
-/*e-xists
-w-hich
-*/
-void setExistsFromWhich(char* e, int* w){
-#if DIM == 2
-	e[4] = 1;
-	e[(w[0]+1)*3+1] = 1;
-	e[3+w[1]+1] = 1;
-	e[(w[0]+1)*3+w[1]+1] = 1;
-#elif DIM == 3
-	e[13]								= 1;//13 is the exact middle of [0-26]. The center cube always exists.
-	e[(w[0]+1)*9+3+1]					= 1;
-	e[9+(w[1]+1)*3+1]					= 1;
-	e[(w[0]+1)*9+(w[1]+1)*3+1]			= 1;
-	e[9+3+(w[2]+1)]						= 1;
-	e[(w[0]+1)*9+3+(w[2]+1)]			= 1;
-	e[9+(w[1]+1)*3+(w[2]+1)]			= 1;
-	e[(w[0]+1)*9+(w[1]+1)*3+(w[2]+1)]	= 1;
-#else
-	#error not defined
-#endif
-}
+
+
 //This defines the offsets of every adjacent cube around a central cube in DIM
 char generatePointsOffsets[DIM*THREEPOWDIM];
 void generatePointsFromExistsInit(){
@@ -125,68 +105,81 @@ void generatePointsFromExistsInit(){
 	}
 	puts("##");
 }
+
 point ptsFromExists[THREEPOWDIM];
-void calcPointsFromExists(int* numPoints, void* exists, point center, int sideLen){//put this in calcRelevantCubes
+
+void calcRelevantCubes(point loc, int mag, int* numPoints){
+	assert(mag > 0 && mag < 30);
+	point center;
+	int sideLen = 1<<mag;
+	int sideLen2 = 1<<(mag-1);//why isn't this -2? Because this is used to correct from a corner to a center, not to find child center
+	long int radiusSquared = (long int)DIM*sideLen2*sideLen2;//FIXME does not need to be calculated each call
+	//long int radius = int_sqrt(radiusSquared);
+
+	for(int d = 0; d < DIM; d++){
+		//Find the cube it is a part of, then put it in that cube's center
+		center.p[d] = (((loc.p[d])/sideLen)*sideLen) + (loc.p[d] >= 0 ? sideLen2 : -sideLen2);
+	}
+	long int offset[THREEPOWDIM] = {0};//This is an array of squared offsets from each of the walls
+	int middleIdx = THREEPOWDIM/2;
+	int idxOffsetToNextMiddle = 1;
+	for(int d = 0; d < DIM; d++){//iterate through dimensions, finding single dimension offset status. At or above DIM=4, this is guaranteed for all (because when Dim >= 4, radius >= 2).
+		long int walldist1 = sideLen2 - (loc.p[d] - center.p[d]);
+		long int walldist2 = sideLen - walldist1;
+		offset[middleIdx+idxOffsetToNextMiddle] = walldist1*walldist1;
+		offset[middleIdx-idxOffsetToNextMiddle] = walldist2*walldist2;
+		idxOffsetToNextMiddle *= 3;
+		//starting at the middle of the 3^DIM cube, one face's center can be found by offsetting by 1. The next by offsetting by 3, 9, etc
+		/* 2D example
+		*  # (1) 2
+		* (3) 0 (3)
+		*  2 (1) #
+		*/
+	}
+	//Using existing calculated faces, find squared distances to each edge, point, etc.
+	#if DIM == 2
+		//corners
+		offset[0] = offset[1]+offset[3];
+		offset[2] = offset[1]+offset[5];
+		offset[6] = offset[7]+offset[3];
+		offset[8] = offset[7]+offset[5];
+	#elif DIM == 3
+		//edges
+		offset[1] = offset[4]+offset[10];
+		offset[3] = offset[4]+offset[12];
+		offset[5] = offset[4]+offset[14];
+		offset[7] = offset[4]+offset[16];
+		offset[9] = offset[10]+offset[12];
+		offset[11] = offset[10]+offset[14];
+		offset[15] = offset[12]+offset[16];
+		offset[17] = offset[14]+offset[16];
+		offset[19] = offset[22]+offset[10];
+		offset[21] = offset[22]+offset[12];
+		offset[23] = offset[22]+offset[14];
+		offset[25] = offset[22]+offset[16];
+		//corners
+		offset[0] = offset[1]+offset[12];
+		offset[2] = offset[1]+offset[14];
+		offset[6] = offset[7]+offset[12];
+		offset[8] = offset[7]+offset[14];
+		offset[18] = offset[19]+offset[12];
+		offset[20] = offset[19]+offset[14];
+		offset[24] = offset[25]+offset[12];
+		offset[26] = offset[25]+offset[14];
+	#else
+		#error undefined
+	#endif
+	//Create new centers based on the squared distances.
 	*numPoints = 0;
 	for(int idx = 0; idx < THREEPOWDIM; idx++){
-		if(((char*) exists)[idx] == 0) continue;//FIXME check if including everything else in an inverse of this statement is faster than continuing
-		point* r = &(ptsFromExists[(*numPoints)]);
+		if(offset[idx] >= radiusSquared) continue;//FIXME check if including everything else in an inverse of this statement is faster than continuing
+		point* r = &(ptsFromExists[*numPoints]);
+		(*numPoints) += 1;
 		(*r) = center;
 		for(int d = 0; d < DIM; d++){
 			r->p[d] += generatePointsOffsets[idx*DIM+d]*sideLen;//FIXME test if doing center.p[d]+generatePoints... is faster then copying the structure and then adding in the specific elements.
 		}
-		(*numPoints)++;
 	}
-}
-
-void calcRelevantCubes(point loc, int mag, int* numPoints){
-	point center;
-	int sideLen = 1<<mag;
-	int sideLen2 = 1<<(mag-1);//why isn't this -2? Because this is used to correct from a corner to a center, not to find child center
-	long int radiusSquared = sideLen2*sideLen2*DIM;
-	for(int d = 0; d < DIM; d++){
-		//Find the cube it is a part of, then put it in that cube's center
-		center.p[d] = (((loc.p[d])/sideLen)*sideLen) + (loc.p[d] >= 0 ? sideLen2 : -sideLen2);
-		/*if(loc.p[d] >= 0){
-			center.p[d]+=sideLen2;
-		}else{
-			center.p[d]-=sideLen2;
-		}*/
-		//printf(" %d", center.p[d]);
-	}
-	//printf("\n");
-	char exists[THREEPOWDIM] = {0};//This is an array of chars equal to 3^dim (aka 9 for dim2, 27 for dim3)
-	//FIXME make fewer dimensions actually be called recursively if the higher dimension ones don't work.
-	int which[DIM];//For 3D, {1,0,-1} is a line along y at positive x and negative z.
-	for(int d = DIM; d >= 1; d--){//This is the number of dimensions we are combining. We start high to eliminate redundant work (e.g. a corner eliminates faces and edges, but nothing can eliminate a point. A point is maximum combined dimensions.
-		for(int e = 0; e < nCr[DIM][d]; e++){
-			nCrChoose(DIM, d, e, which);//Figure out which dimensions we are combining
-			do{//Get all positive and negative options
-				point projection;
-				for(int d2 = 0; d2 < DIM; d2++){//This for loop used to be a function "createProjectionPoint"
-					projection.p[d2] = center.p[d2]+which[d2]*sideLen2;
-				}
-				//Distancesquared(loc, projection)
-				/*double distSquared = 0.0;
-				for(int distSqDim = 0; distSqDim < DIM; distSqDim++){
-					distSquared+=(loc.p[distSqDim]-projection.p[distSqDim])*(loc.p[distSqDim]-projection.p[distSqDim]);
-				}*/
-				#if DIM == 2
-					long int distSquared = (loc.p[0]-projection.p[0])*(loc.p[0]-projection.p[0])+(loc.p[1]-projection.p[1])*(loc.p[1]-projection.p[1]);
-				#elif DIM == 3
-					long int distSquared = (loc.p[0]-projection.p[0])*(loc.p[0]-projection.p[0])+(loc.p[1]-projection.p[1])*(loc.p[1]-projection.p[1])+(loc.p[2]-projection.p[2])*(loc.p[2]-projection.p[2]);
-				#else
-					#error undefined
-				#endif
-				//end distancesquared
-				//if(radiusSquared > distanceSquared(loc, projection)){
-				if(radiusSquared > distSquared){
-					setExistsFromWhich(exists, which);
-				}
-			}while(progressNextElement(which, DIM));
-		}
-	}
-	calcPointsFromExists(numPoints, exists, center, sideLen);
 }
 
 void treeGenSvgRec(tree* t, svg* s, point p){

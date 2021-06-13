@@ -164,7 +164,7 @@ char oinstanceExists(oinstance* target, point tloc, int mag){
 	int relevantCount = 0;
 	calcRelevantCubes(tloc, mag, &relevantCount);//FIXME getRelevantCubes gets called on mag=0, which it hates.
 	assert(relevantCount > 0);
-	char full = 1;
+	char full = 1;//FIXME make bit fields of single char to allow for efficient early exit in later parts of algo.
 	char empty = 1;
 	int formMag = target->type->form->mag;
 	int* relpt;
@@ -173,7 +173,7 @@ char oinstanceExists(oinstance* target, point tloc, int mag){
 			relpt = ptsFromExists[t].p;
 			char implicitExternal = 0;
 			for(int d = 0; d < DIM; d++){
-				if(abs(relpt[d]) > 1<<(mag-1)){//The target is too small to notice, but outside
+				if(abs(relpt[d]) > 1<<(mag-1)){//The target is too small to notice, but outside //FIXME 1<<(mag-1) gets computed an awful lot.
 					implicitExternal = 1;
 					break;
 				}
@@ -191,8 +191,8 @@ char oinstanceExists(oinstance* target, point tloc, int mag){
 		for(int t = 0; t < relevantCount; t++){
 			relpt = ptsFromExists[t].p;
 			char outside = 0;
-			for(int d = 0; d < DIM; d++){
-				if(abs(relpt[d]) > 1<<(formMag-1)){
+			for(int d = 0; d < DIM; d++){//FIXME - this is expensive. Check initially if it is possibly applicable to any of them to hopefully avoid it altogether.
+				if(abs(relpt[d]) > 1<<(formMag-1)){//FIXME 1<<(formMag-1) gets computed an awful lot.
 					outside = 1;
 					break;
 				}

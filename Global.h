@@ -56,6 +56,7 @@ extern double distance(point a, point b);
 extern double distanceSquared(point a, point b);
 extern int factorial[12];
 extern int intPow(int b, int x);
+extern unsigned long int_sqrt(unsigned long s);
 extern int nCr[11][11];
 extern void nCrChooseInit();
 extern void nCrChoose(int n, int r, int idx, int* w);

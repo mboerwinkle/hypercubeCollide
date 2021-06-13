@@ -182,6 +182,21 @@ int intPow(int b, int x){//Enable this for higher dimensions (since higher dims 
 	return ret;
 }
 #endif
+//From https://en.wikipedia.org/wiki/Integer_square_root
+unsigned long int_sqrt(unsigned long s){
+	unsigned long x0 = s >> 1;// Initial estimate
+	// Sanity check
+	if(x0){
+		unsigned long x1 = (x0 + s / x0) >> 1;// Update
+		while (x1 < x0){// This also checks for cycle
+			x0 = x1;
+			x1 = (x0 + s / x0) >> 1;
+		}
+		return x0;
+	}else{
+		return s;
+	}
+}
 /*int min(int a, int b){
 	if(a < b) return a;
 	return b;

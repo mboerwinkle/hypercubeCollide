@@ -8,7 +8,7 @@ typedef struct tree{
 	char full;//1 or 0;
 }tree;
 extern void deleteTree(tree* t);
-extern tree* buildTree(FILE* fp);//mag is the magnitude of the tree. mag is the max+1
+extern tree* buildTree(FILE* fp, int mag);
 extern int verifyTreeMagnitudes(tree* t);
 //This function finds the cube overlapped by the given cube. In the future, it should accept rotation to further narrow it down.
 extern point ptsFromExists[THREEPOWDIM];

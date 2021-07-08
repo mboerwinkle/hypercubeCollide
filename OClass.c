@@ -19,7 +19,8 @@ int loadOClass(char* name, char* path){
 		return -1;
 	}
 	int fDim = 0;
-	fscanf(fp, "%d", &fDim);
+	int mag = 0;
+	fscanf(fp, "NHC%d_%X_", &fDim, &mag);
 	if(fDim != DIM){//Dimensions don't match
 		fclose(fp);
 		printf("loaded oclass %s has wrong dimensions\n", path);
@@ -31,7 +32,7 @@ int loadOClass(char* name, char* path){
 	new->name[20] = 0;
 	
 	//build tree from file.
-	new->form = buildTree(fp);
+	new->form = buildTree(fp, mag);
 	fclose(fp);
 	
 	if(verifyTreeMagnitudes(new->form)){

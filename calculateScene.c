@@ -127,7 +127,7 @@ void calculateNextSceneQueueObject(){
 	//remove every element in removal pool
 	{
 	char removeList[t->presentCount];//if it is zero, remove it. we set both to 1 when they don't collide (but can collide).
-	bzero(removeList, t->presentCount);
+	memset(removeList, 0, t->presentCount);
 	collision test;
 	for(int idx = 0; idx < t->presentCount; idx++){
 		if(removeList[idx]) continue;//if already known to stay, no need to check.

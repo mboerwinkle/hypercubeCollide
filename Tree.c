@@ -13,31 +13,24 @@ void deleteTree(tree* t){
 
 void fixTreeMag(tree* t, int mag);
 
-tree* buildTree(FILE* fp){
+tree* buildTree(FILE* fp, int mag){
+	assert(mag >= 0);
 	char c = fgetc(fp);
 	if(c == 'E'){
 		return NULL;
 	}
 	tree* ret = malloc(sizeof(tree));
+	ret->mag = mag+1;
 	if(c == 'P'){
 		ret->full = 0;
-		int maxMag = -1;
 		for(int x = 0; x < TWOPOWDIM; x++){
-			ret->c[x] = buildTree(fp);
-			if(ret->c[x]){
-				int testMag = ret->c[x]->mag;
-				if(testMag > maxMag) maxMag = testMag;
-			}
+			ret->c[x] = buildTree(fp, mag-1);
 		}
-		assert(maxMag >= 1);
-		fixTreeMag(ret, maxMag+1);
 	}else if(c == 'F'){
 		ret->full = 1;
-		ret->mag = 1;
 		for(int x = 0; x < TWOPOWDIM; x++){
 			ret->c[x] = NULL;
 		}
-		//bzero(ret->c, TWOPOWDIM*sizeof(tree*));
 	}else{
 		printf("Buildtree encountered unknown character \"%c\"", c);
 		free(ret);

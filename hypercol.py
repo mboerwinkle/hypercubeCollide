@@ -47,8 +47,17 @@ class Hypercol:
 		l.calculateScene.argtypes = []
 		l.getCollisions.argtypes = []
 		l.getCollisions.restype = c.POINTER(c.c_int)#c.c_void_p
-		l.newOInstance.argtypes = [c.c_char_p, c.c_int, point, orientation, c.c_float]
-		l.newOInstance.restype = c.c_void_p
+
+#extern oinstance* newOInstance_o(int colType, point loc, orientation rot, char* classname);
+		l.newOInstance_o.argtypes = [c.c_int, point, orientation, c.c_char_p]
+#extern oinstance* newOInstance_s(int colType, point loc, int rad);
+		l.newOInstance_s.argtypes = [c.c_int, point, c.c_int]
+#extern oinstance* newOInstance_l(int colType, point loc, point disp);
+		l.newOInstance_l.argtypes = [c.c_int, point, point]
+		
+		l.newOInstance_o.restype = c.c_void_p
+		l.newOInstance_s.restype = c.c_void_p
+		l.newOInstance_l.restype = c.c_void_p
 		l.addInstance.argtypes = [c.c_void_p]
 
 	def __del__(self):
@@ -76,7 +85,11 @@ class Hypercol:
 	def getCollisions(self):
 		return self.l.getCollisions()
 
-	def newOInstance(self, name, coltype, loc, rot, scale):
-		return self.l.newOInstance(name.encode(), coltype, loc, rot, scale)
+	def newOInstance_o(self, coltype, loc, rot, name):
+		return self.l.newOInstance_o(coltype, loc, rot, name.encode())
+	def newOInstance_l(self, coltype, loc, disp):
+		return self.l.newOInstance_l(coltype, loc, disp)
+	def newOInstance_s(self, coltype, loc, rad):
+		return self.l.newOInstance_s(coltype, loc, rad)
 	def addInstance(self, inst):
 		self.l.addInstance(inst)

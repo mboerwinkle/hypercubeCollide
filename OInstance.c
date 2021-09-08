@@ -28,33 +28,52 @@ void deleteCollision(void* a, void* b){
 	//a is the collision. b doesn't exist.
 	free(a);
 }
-oinstance* newOInstance(char* classname, int colType, point loc, orientation rot, float scale){
+oinstance* newOInstance_common(char type, int colType, point loc){
+	assert(type == 's' || type == 'o' || type == 'l');
 	oinstance* ret = malloc(sizeof(oinstance));
-	ret->type = getOClass(classname);
-	if(ret->type == NULL){
-		printf("Unable to retrieve oclass %s\nClasses are: ", classname);
-		listKeys(oclasshandler.map);
-	}
-	//coltype is used for collisionmaps
+	assert(ret);
+	ret->type = type;
 	ret->colType = colType;
 	ret->loc = loc;
-	ret->rot = rot;
-//	ret->scale = scale;
-
-	//fast lookup stack
-	ret->currTidx = 0;
-	ret->currT = (tree**)calloc(ret->type->form->mag, sizeof(tree*));
-	ret->currT[0] = ret->type->form;
-	ret->currTloc = (point*)calloc(ret->type->form->mag, sizeof(point));
-	//calloc zeros, so currTloc[0] is correctly all 0.
-	//end fast lookup stack
 	return ret;
 }
+oinstance* newOInstance_o(int colType, point loc, orientation rot, char* classname){
+	oinstance* ret = newOInstance_common('o', colType, loc);
+	ret->o.rot = rot;
+	ret->o.type = getOClass(classname);
+	#ifndef NDEBUG
+		if(!ret->o.type){
+			printf("Unable to retrieve oclass %s\nClasses are: ", classname);
+			listKeys(oclasshandler.map);
+			assert(0);
+		}
+	#endif
+	//Local Lookup Stack
+	ret->o.currTidx = 0;
+	ret->o.currT = (tree**)calloc(ret->o.type->form->mag, sizeof(tree*));
+	ret->o.currT[0] = ret->o.type->form;
+	ret->o.currTloc = (point*)calloc(ret->o.type->form->mag, sizeof(point));
+	return ret;
+}
+oinstance* newOInstance_s(int colType, point loc, int rad){
+	oinstance* ret = newOInstance_common('s', colType, loc);
+	ret->s.rad = rad;
+	return ret;
+}
+oinstance* newOInstance_l(int colType, point loc, point disp){
+	oinstance* ret = newOInstance_common('l', colType, loc);
+	ret->l.disp = disp;
+	return ret;
+}
+
+//FIXME can we specify oinstance ptr as type of a? If so, perform for all hashtable utility functions
 void deleteOInstance(void* a, void* b){
 	//b is null
 	oinstance* o = (oinstance*)a;
-	free(o->currT);
-	free(o->currTloc);
+	if(o->type == 'o'){
+		free(o->o.currT);
+		free(o->o.currTloc);
+	}
 	free(o);
 }
 //This function does not check surrounding cubes. It just blindreturns the status of the cube at the specified magnitude which holds "inside". Assumes point falls inside definition
@@ -92,7 +111,7 @@ char getSpecificCube(oinstance* target, int* inside, int mag){//inside is effect
 }
 */
 
-char getSpecificCube(oinstance* target, int* inside, int mag){//inside is effectively the int array contained in a point.
+char getSpecificCube(oobj* target, int* inside, int mag){//inside is effectively the int array contained in a point.
 	tree** currT = target->currT;
 	point* currTloc = target->currTloc;
 	int* currTidx = &target->currTidx;
@@ -158,19 +177,110 @@ char getSpecificCube(oinstance* target, int* inside, int mag){//inside is effect
 //This is in oinstance instead of oclass for eventual support for instance-specific scaling
 char oinstanceExists(oinstance* target, point tloc, int mag){
 	for(int d = 0; d < DIM; d++) tloc.p[d] -= target->loc.p[d];//get local displacement
-	int formMag = target->type->form->mag;
-	//when the max mag of instance is bigger than me
-	if(mag >= formMag){
-		//The tloc/mag doesn't overlap target at all
-		if(odistance(tloc) > SQRTDIM * ((1<<(mag-1))+(1<<(formMag-1)))){
-			return 'E';
+	int sidelen2 = 1<<(mag-1);
+	if(target->type == 'o'){
+		int formMag = target->o.type->form->mag;
+		//when the max mag of instance is bigger than me
+		if(mag >= formMag){
+			//The tloc/mag doesn't overlap target at all
+			if(odistance(tloc) > SQRTDIM * (sidelen2+(1<<(formMag-1)))){
+				return 'E';
+			}
+			return 'P';
+		}else{//If this is smaller than the max size of this instance
+			tloc = rotatePoint(tloc, target->o.rot, -1.0);//get local reference frame
+			char status = getSpecificCube(&(target->o), tloc.p, mag);//This line changes tloc's value
+			//printf("smaller %c\n", status);
+			if(mag <= RESOLUTION && status != 'E') return 'F';
+			return status;
 		}
+	}else if(target->type == 's'){
+		point closest = {.p={0}};
+		for(int d = 0; d < DIM; d++){
+			if(closest.p[d] < tloc.p[d] - sidelen2){
+				closest.p[d] = tloc.p[d]-sidelen2;
+			}else if(closest.p[d] > tloc.p[d] + sidelen2){
+				closest.p[d] = tloc.p[d]+sidelen2;
+			}
+		}
+		if(odistance(closest) > target->s.rad){
+			return 'E';
+		}else if(mag <= RESOLUTION) return 'F';
+		point furthest;
+		for(int d = 0; d < DIM; d++){
+			furthest.p[d] = (tloc.p[d] > 0) ? (tloc.p[d] + sidelen2) : (tloc.p[d] - sidelen2);
+		}
+		if(odistance(furthest) <= target->s.rad) return 'F';
 		return 'P';
-	}else{//If this is smaller than the max size of this instance
-		tloc = rotatePoint(tloc, target->rot, -1.0);//get local reference frame
-		char status = getSpecificCube(target, tloc.p, mag);//This line changes tloc's value
-		//printf("smaller %c\n", status);
-		if(mag <= RESOLUTION && status != 'E') return 'F';
-		return status;
+	}else{
+		assert(target->type == 'l');
+		point cubecenteredstart, cubecenteredend;
+		//used for nDim Cohen-Sutherland. Bits used = 2*DIM
+		#if DIM <= 4
+		 char
+		#else
+		 #error unimplemented. Choose some non-char known bit-width integer.
+		#endif
+		  startbits = 0, endbits = 0;
+		int nextcorrectbit = -1;
+		for(int d = 0; d < DIM; d++){
+			cubecenteredstart.p[d] = -tloc.p[d];
+			if(cubecenteredstart.p[d] < -sidelen2){
+				startbits |= 1<<(2*d+1);//FIXME remove code duplication and duplicate bitshift calculations
+			}else if(cubecenteredstart.p[d] > sidelen2){
+				startbits |= 1<<(2*d);
+			}
+			cubecenteredend.p[d] = cubecenteredstart.p[d]+target->l.disp.p[d];
+			if(cubecenteredend.p[d] < -sidelen2){
+				nextcorrectbit = 2*d+1;
+				endbits |= 1<<nextcorrectbit;//FIXME nextcorrectbit order should be based on accuracy of operation.
+			}else if(cubecenteredend.p[d] > sidelen2){
+				nextcorrectbit = 2*d;
+				endbits |= 1<<nextcorrectbit;
+			}
+		}
+		double enddist = 1.0;
+		#ifndef NDEBUG
+		 int iterations = 0;
+		//int iterationrecord[DIM+1] = {-1};
+		#endif
+		while(endbits){
+			//Per Cohen-Sutherland
+			if(startbits & endbits) return 'E';
+			#ifndef NDEBUG
+			iterations++;
+			if(iterations > DIM){
+				printf("dist: %lf\n", enddist);
+				assert(iterations <= DIM);
+			}
+			#endif
+			//compute target dimension from 'nextcorrectbit'
+			int targetdim = nextcorrectbit/2;
+			int targetplane = -sidelen2*((nextcorrectbit%2)*2-1);
+			enddist = (double) (targetplane-cubecenteredstart.p[targetdim]) / (double) target->l.disp.p[targetdim];
+			#ifndef NDEBUG
+			if(!(enddist <= 1.0 && enddist >= 0)){
+				printf("enddist out of [0,1] range (%lf)\n", enddist);
+				printf("targetdim %d targetplane %d relevantcubecenteredstart %d dimdisp %d\n", targetdim, targetplane, cubecenteredstart.p[targetdim], target->l.disp.p[targetdim]);
+				printf("endbits: 0x%X nextcorrectbit: %d\n", endbits, nextcorrectbit);
+				assert(enddist <= 1.0 && enddist >= 0);
+			}
+			#endif
+			for(int d = 0; d < DIM; d++){
+				cubecenteredend.p[d] = cubecenteredstart.p[d] + (int)(target->l.disp.p[d] * enddist);
+			}
+			assert(cubecenteredend.p[targetdim] == targetplane);
+			endbits = 0;
+			for(int d = 0; d < DIM; d++){
+				if(cubecenteredend.p[d] < -sidelen2){
+					nextcorrectbit = 2*d+1;
+					endbits |= 1<<nextcorrectbit;//FIXME nextcorrectbit order should be based on accuracy of operation.
+				}else if(cubecenteredend.p[d] > sidelen2){
+					nextcorrectbit = 2*d;
+					endbits |= 1<<nextcorrectbit;
+				}
+			}
+		}
+		return (mag <= RESOLUTION) ? 'F' : 'P';
 	}
 }

@@ -56,13 +56,21 @@ void calculateSceneLocus(){
 		//curr is the pointer to the current object
 		oinstance *curr = currHash->key;
 		//calculate diameter of instance (the distance to the corner)
-		int diameter = (1<<curr->type->form->mag)*SQRTDIM+1;//*scale
+		int radius;
+		if(curr->type == 'o'){
+			radius = (1<<(curr->o.type->form->mag-1))*SQRTDIM+1;
+		}else if(curr->type == 's'){
+			radius = curr->s.rad;
+		}else{
+			assert(curr->type == 'l');
+			radius = odistance(curr->l.disp);
+		}
 		#ifdef DRAW
-			addSvgObj(draw, newSvgCircle(curr->loc.p[0], curr->loc.p[1], diameter/2, green, 0, 250));
+			addSvgObj(draw, newSvgCircle(curr->loc.p[0], curr->loc.p[1], radius, green, 0, 250));
 		#endif
 		for(int d = 0; d < DIM; d++){
-			int min = curr->loc.p[d]-diameter/2;
-			int max = curr->loc.p[d]+diameter/2;
+			int min = curr->loc.p[d]-radius;
+			int max = curr->loc.p[d]+radius;
 			if(min < sceneMin.p[d]) sceneMin.p[d] = min;
 			if(max > sceneMax.p[d]) sceneMax.p[d] = max;
 		}
@@ -95,10 +103,11 @@ void initSceneQueue(){
 		initq->present[idx] = (oinstance*)(currHash->key);
 		idx++;
 		#ifdef DRAW
+			#error needs rework for oinstance split
 			char name[30];
 			sprintf(name, "out_%s.svg", ((oinstance*)(currHash->key))->type->name);
 			int sideLen2 = 1<<(((oinstance*)(currHash->key))->type->form->mag-1);
-			addSvgObj(draw, newSvgRef(name, ((oinstance*)(currHash->key))->loc.p[0]-sideLen2, ((oinstance*)(currHash->key))->loc.p[1]-sideLen2, sideLen2*2, sideLen2*2, -((oinstance*)(currHash->key))->rot.r, black, 0));
+			addSvgObj(draw, newSvgRef(name, ((oabstr*)(currHash->key))->loc.p[0]-sideLen2, ((oabstr*)(currHash->key))->loc.p[1]-sideLen2, sideLen2*2, sideLen2*2, -((oinstance*)(currHash->key))->rot.r, black, 0));
 		#endif
 		currHash = currHash->next;
 	}
